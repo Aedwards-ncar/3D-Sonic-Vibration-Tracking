@@ -1,6 +1,6 @@
 # AC001 Tower Accelerometer / Gyro Node
 
-MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **Bosch BNO055** (raw accelerometer + gyroscope) and streams the data as plain ASCII over **RS-485** at 120 Hz. Built for unattended mounting on a tower: it has hardware and software watchdogs, I2C fault recovery, automatic calibration, and a remote command interface so it can be reset, recalibrated, or paused from the far end of the cable.
+MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **BNO055** (raw accelerometer + gyroscope) and streams the data as plain ASCII over **RS-485** at 120 Hz. Built for unattended mounting on a tower: it has hardware and software watchdogs, I2C fault recovery, automatic calibration, and a remote command interface so it can be reset, recalibrated, or paused from the far end of the cable.
 
 <!-- Add wiring diagram here -->
 <!-- ![Wiring diagram](docs/wiring.png) -->
@@ -27,8 +27,6 @@ MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **Bosch BNO055**
 | Adafruit BNO055 breakout | Used in AMG (raw) mode, see below |
 | SparkFun SP3485 RS-485 breakout | 3.3 V transceiver |
 | MPM3610 5 V buck breakout | 12 V in, 5 V out to Pico VSYS |
-| 10 kΩ resistor | Pull-down on GP2 so the RS-485 driver stays off during boot/reset |
-| 120 Ω resistor | Bus termination at the far end of the cable |
 
 ### Pin map
 
@@ -42,19 +40,8 @@ MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **Bosch BNO055**
 | 3V3 OUT (pin 36) | 3.3 V | BNO055 VIN, SP3485 VCC |
 | VSYS (pin 39) | 5 V in | MPM3610 5 V output |
 | GND | Ground | All grounds common |
-| GP6 (pin 9) *(optional)* | Sensor power | BNO055 VIN, instead of 3V3 (`SENSOR_PWR_PIN = 6`) |
-| GP7 (pin 10) *(optional)* | Sensor reset | BNO055 RST (`SENSOR_RST_PIN = 7`) |
 
 BNO055 I2C address is `0x28` with the ADR pin unconnected (`0x29` if pulled high; set `BNO_ADDR`).
-
-### RS-485 notes
-
-- **Polarity:** on the SP3485, **A = non-inverting (D+/Tx+/Rx+)** and **B = inverting (D−/Tx−/Rx−)**. Letter labelling is inconsistent between manufacturers, so match **+ to +** and **− to −** rather than A to A. If you see no data or garbage on first power-up, swap the pair.
-- **Half-duplex:** one twisted pair carries both directions.
-- **Termination:** 120 Ω across the pair at the far end.
-- **Biasing:** at the host end, add bias resistors (about 560 Ω to 1 kΩ) pulling the + line up to 3.3 V and the − line down to GND so an idle bus reads as logic high. Many USB-RS485 adapters already include this.
-- **Ground:** run a ground reference wire along with the pair if possible.
-- **Surge protection:** at height, use RS-485 TVS surge protection at both ends and proper grounding. Consider an isolated transceiver if the ground reference can't be guaranteed.
 
 ## Serial output
 
@@ -218,13 +205,6 @@ The sensor ranges and filter bandwidth are set in `start_sensor()`, not in the s
 
 The output units are fixed at m/s² and rad/s via `UNIT_SEL`. If you change a range, check the BNO055 datasheet for the matching register value. The scale constants (`ACCEL_SCALE`, `GYRO_SCALE`) apply to the unit selection, so they don't change with range.
 
-## Installation
-
-1. Flash MicroPython for the **Pico 2** from [micropython.org](https://micropython.org/download/RPI_PICO2/) (hold BOOTSEL, plug in USB, drag the UF2 onto the drive).
-2. Copy `main.py` to the Pico with Thonny. It runs automatically at every power-up.
-3. Connect the hardware as in the pin map above.
-4. Open the Pico's USB serial port in a terminal (any baud rate), or connect an RS-485 adapter at the other end of the cable at 230400 8N1.
-
 ## PC viewer
 
 `ac001_viewer.py` plots gyro (left) and accel (right) live.
@@ -239,9 +219,3 @@ python ac001_viewer.py --demo                              # synthetic data, no 
 
 Keys: **space** pauses, **c** clears. The viewer verifies checksums if enabled, shows status messages and the measured sample rate, and reconnects automatically if the port drops. The viewer matches the ID `AC001`, so edit `SENSOR_ID` at the top of the script if you change the firmware's ID.
 
-## Limitations
-
-- Raw accelerometer and gyro only. The BNO055's fused orientation output is not used, because its fusion modes are limited to 100 Hz.
-- The USB serial port is output-only. Commands are accepted over RS-485 only.
-- A command can be missed if it arrives while the Pico is transmitting (half-duplex), so repeat commands.
-- Calibration assumes the mast is still. Swaying at boot falls back to the saved calibration.
