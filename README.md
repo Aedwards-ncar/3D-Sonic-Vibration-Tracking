@@ -446,6 +446,168 @@ In the 120 Hz raw profile (`AMG` mode) the ranges and bandwidths are set in `sta
 
 In the 60 Hz chip profile (fusion mode) the chip sets its own ranges and bandwidth, and these writes are skipped. The output units are fixed at m/s² and rad/s via `UNIT_SEL`, so `ACCEL_SCALE` and `GYRO_SCALE` don't change with range.
 
+## DSM (NIDAS) configuration
+
+How to set up the data system (DSM) that records this sensor. Three files are involved, plus the wiring and the port mode.
+
+| File | What goes in it |
+|---|---|
+| `sensor_catalog.xml` | The sensor definition: baud rate, port type, how each line is parsed, variable names and units |
+| `callab.xml` (the project config that `configs.xml` points to) | Which port the sensor is on, its sensor `id`, and a name suffix |
+| `configs.xml` | The plot-range variables the catalog entry refers to |
+
+### 1. Sensor catalog entry (`sensor_catalog.xml`)
+
+Paste this just above the closing `</sensorcatalog>` tag. It is also in `ac001_catalog_entry.xml`.
+
+```xml
+    <!-- AC001: Pico 2 + BNO055 motion sensor mounted on the sonic.
+         ASCII lines, 115200 8N1, RS-485 half duplex, CRLF terminated. The "AC001" at the start of each line is the sensor's own
+         ID (commands TYP and SID change it), so the formats below skip the first field instead of spelling it out.
+         Two profiles, only one active at a time (command PRF 60 / PRF 120):
+           <ID>,C,ax,ay,az,gx,gy,gz   60 Hz (default): BNO055 chip output, linear accel (gravity removed)
+           <ID>,R,ax,ay,az,gx,gy,gz   120 Hz: raw sensor data with Pico calibration
+         <ID>,STAT,sys,gyr,acc,mag    every 10 s in the 60 Hz profile: chip calibration levels 0-3
+         accel in m/s^2, gyro in rad/s. Boot, reply and other status lines match none of the formats and are ignored. -->
+    <serialSensor ID="AC001" class="DSMSerialSensor"
+        baud="115200" parity="none" databits="8" stopbits="1" porttype="RS485_HALF">
+        <!-- 60 Hz chip profile -->
+        <sample id="1" scanfFormat="%*[^,],C,%f,%f,%f,%f,%f,%f" rate="60">
+            <variable name="Ax_c" units="m/s^2" longname="AC001 accel X, chip profile" plotrange="$ACC_RANGE"/>
+            <variable name="Ay_c" units="m/s^2" longname="AC001 accel Y, chip profile" plotrange="$ACC_RANGE"/>
+            <variable name="Az_c" units="m/s^2" longname="AC001 accel Z, chip profile" plotrange="$ACC_RANGE"/>
+            <variable name="Gx_c" units="rad/s" longname="AC001 angular rate X, chip profile" plotrange="$GYRO_RANGE"/>
+            <variable name="Gy_c" units="rad/s" longname="AC001 angular rate Y, chip profile" plotrange="$GYRO_RANGE"/>
+            <variable name="Gz_c" units="rad/s" longname="AC001 angular rate Z, chip profile" plotrange="$GYRO_RANGE"/>
+        </sample>
+        <!-- 120 Hz raw profile -->
+        <sample id="2" scanfFormat="%*[^,],R,%f,%f,%f,%f,%f,%f" rate="120">
+            <variable name="Ax_r" units="m/s^2" longname="AC001 accel X, raw profile" plotrange="$ACC_RANGE"/>
+            <variable name="Ay_r" units="m/s^2" longname="AC001 accel Y, raw profile" plotrange="$ACC_RANGE"/>
+            <variable name="Az_r" units="m/s^2" longname="AC001 accel Z, raw profile" plotrange="$ACC_RANGE"/>
+            <variable name="Gx_r" units="rad/s" longname="AC001 angular rate X, raw profile" plotrange="$GYRO_RANGE"/>
+            <variable name="Gy_r" units="rad/s" longname="AC001 angular rate Y, raw profile" plotrange="$GYRO_RANGE"/>
+            <variable name="Gz_r" units="rad/s" longname="AC001 angular rate Z, raw profile" plotrange="$GYRO_RANGE"/>
+        </sample>
+        <!-- optional: BNO055 calibration levels (0 none to 3 full), sent every 10 s in the 60 Hz profile -->
+        <sample id="3" scanfFormat="%*[^,],STAT,%d,%d,%d,%d" rate="0.1">
+            <variable name="CalSys" units="none" longname="AC001 chip calibration, system"/>
+            <variable name="CalGyr" units="none" longname="AC001 chip calibration, gyro"/>
+            <variable name="CalAcc" units="none" longname="AC001 chip calibration, accel"/>
+            <variable name="CalMag" units="none" longname="AC001 chip calibration, magnetometer"/>
+        </sample>
+        <message separator="\r\n" position="end" length="0"/>
+    </serialSensor>
+```
+
+Points to know:
+
+- **`porttype="RS485_HALF"`** matches the half-duplex hardware. For a data-only, receive-only hookup on the RS-422 pins, use `porttype="RS422"` instead (see the port section).
+- **`baud="115200"`** must match the sensor. If you change it with the `BAU` command, change it here too.
+- **The formats start with `%*[^,]`, which skips the sensor's own ID.** That lets you change the ID with `TYP` and `SID` without touching the catalog. The catalog `ID="AC001"` is only the name of this catalog entry, and it doesn't have to match the sensor's ID.
+- **Which sample gets data depends on the profile.** The 60 Hz chip profile fills sample 1 (and sample 3 every 10 s). The 120 Hz raw profile fills sample 2. The other stays empty.
+- **Boot messages, replies, and `DIR`/`INF` output match none of the formats** and are ignored.
+- **Variable names have the port suffix added by NIDAS**, for example `Ax_c.0` on port 0.
+
+### 2. Port assignment (`callab.xml`)
+
+Add the sensor to the DSM's list, with the port it is wired to:
+
+```xml
+<serialSensor IDREF="AC001" devicename="/dev/ttyDSM0" suffix=".0" id="100">
+</serialSensor>
+```
+
+- `IDREF="AC001"` is the catalog entry from step 1.
+- `devicename` is the DSM serial port (`/dev/ttyDSM0` is port 0).
+- `id` must be unique among the sensors on that DSM. The sample ids NIDAS reports are `id` + the sample number, so with `id="100"` the raw line is `100` and the parsed samples are `101`, `102`, and `103`.
+- `suffix` is added to the variable names (`Ax_c.0`).
+
+Example site with only this sensor on port 0 (add the sensors your DSM needs):
+
+```xml
+<site name="TONY_TEST" class="isff.GroundStation" suffix="">
+    <dsm name="$SITE" id="5" rserialPort="30002">
+
+        <serialSensor IDREF="AC001" devicename="/dev/ttyDSM0" suffix=".0" id="100">
+        </serialSensor>
+
+        <output class="RawSampleOutputStream">
+            <socket type="server" port="30000" maxIdle="60" block="false"/>
+        </output>
+
+        <output class="RawSampleOutputStream">
+            <fileset dir="$DATAMNT/projects/${PROJECT}/raw_data"
+                    file="${DSM}_%Y%m%d_%H%M%S.dat"
+                    length="43200">
+                <mount dir="$DATAMNT"/>
+            </fileset>
+        </output>
+    </dsm>
+</site>
+```
+
+`callab.xml` pulls in the catalog with an `xi:include`, so the edited `sensor_catalog.xml` must be in the same directory. Only one `<site>` runs at a time, and the DSM chooses it by the `$SITE` setting. Don't put two sensors on the same `devicename`.
+
+### 3. Plot ranges (`configs.xml`)
+
+The catalog entry uses `$ACC_RANGE` and `$GYRO_RANGE`. Add these inside the config's list of environment variables, next to the other range variables:
+
+```xml
+<envvar name="ACC_RANGE" value="-10 10"/>
+<envvar name="GYRO_RANGE" value="-2 2"/>
+```
+
+Adjust the numbers to taste. If you keep gravity in the accel (`ACCEL_CAL_MODE = "SCALE"`, or `CHIP_ACCEL = "ACC"`), use a wider accel range such as `-15 15`. This file is ISO-8859-1, so type plain ASCII.
+
+### 4. Wiring and port mode
+
+NCAR/EOL Bulgin connector pins (signals with respect to the DSM) for **RS-485 half-duplex**:
+
+| Pin | Signal | Connect to |
+|---|---|---|
+| 1 | +12 VDC (DSM to sensor) | Buck converter input |
+| 2 | Shield | Connect at one end only |
+| 4 | Tx−/Rx− | Breakout **B** (inverting, −) |
+| 5 | Tx+/Rx+ | Breakout **A** (non-inverting, +) |
+| 7 | Signal ground | Breakout GND |
+| 8 | Gnd (power return) | Buck converter ground |
+| 3, 6 | Not used in RS-485 half | Leave unconnected |
+
+- **Match polarity by sign, not by letter.** The connector table's `(A)` and `(B)` letters follow the TIA convention (A is −), while the SP3485 breakout's A is the non-inverting (+) line. Connect the breakout's A to a `+` pin and its B to a `−` pin. If the data is garbage, swapping the two wires is harmless.
+- **The same pins 4 and 5 are the DSM's transmit pair in RS-422 mode** (and RTS and RxD in RS-232 mode). The DSM only listens there if the port really is in RS-485 half-duplex mode.
+- **The XML setting only takes effect on the new FTDI serial boards.** On other boards the mode is set by a jumper on the board. To check what a port is doing, disconnect the sensor and measure DC volts across pins 5 and 4 with the DSM running: several volts means the DSM is driving the pair (RS-422-type mode), while about 0 to 0.5 V is the idle state you want.
+- **Data only (no commands from the DSM):** you can instead use the RS-422 receive pair, pins 3 (`Rx−`) and 6 (`Rx+`), with `porttype="RS422"`. The DSM can't send commands to the sensor that way.
+- **Sending commands from the DSM** needs half-duplex on pins 4 and 5, with the DSM's driver switched on while it writes. Boards that switch the driver with the RTS line need the `rts485` attribute in the catalog entry (your `LUFFT` entry uses it). See [Sending commands from the DSM](#sending-commands-from-the-dsm-over-ssh).
+
+### 5. Applying and checking
+
+1. Back up the files you will edit: `cp sensor_catalog.xml sensor_catalog.xml.bak` (and the same for `callab.xml` and `configs.xml`).
+2. Make the edits, then check each file is still valid XML: `xmllint --noout <file>`.
+3. Restart the DSM the way you normally do.
+4. See what arrives: `data_stats sock:localhost:30000` lists a line for the sensor with its sample count and rate.
+5. Look at the text: `data_dump -i 5,100 -A sock:localhost:30000` (DSM id 5, sensor id 100). Use `5,101` for the parsed 60 Hz samples.
+6. To look at the raw port instead, stop NIDAS and run `stty -F /dev/ttyDSM0 115200 cs8 -parenb -cstopb raw -echo`, then `cat /dev/ttyDSM0`. You should see `AC001,C,...` lines.
+
+### 6. Things that can bite
+
+- **Timeouts while the sensor is silent.** In command mode (up to 120 s) or after `STR OFF`, NIDAS receives nothing. If it logs timeouts or reopens the port, raise the sensor's `timeout` attribute.
+- **Baud changes.** `BAU` changes the sensor's rate immediately. Update the catalog `baud` to match, then restart the DSM.
+- **Stop NIDAS before talking to the sensor by hand** (`pico_cmd.py`, picocom, `cat`). Only one program can use the port.
+- **A changed ID is not a problem** for the catalog as long as it uses the `%*[^,]` formats above. The viewer (`ac001_viewer.py`) also accepts any ID.
+
+### 7. Link test scripts
+
+If the DSM isn't seeing clean lines, these scripts isolate the problem. Run them from Thonny on the Pico, with `main.py` not running:
+
+| Script | What it does |
+|---|---|
+| `rs485_ping.py` | Sends `ping` once a second with the driver held on. The simplest end-to-end test |
+| `rs485_test.py` | Sends a fixed data-style line at 60 Hz |
+| `rs485_u_test.py` | Sends a continuous stream of `U`, the simplest waveform for a scope |
+| `rs485_static_test.py` | Holds the driver at a steady high, then low, so a multimeter can check A minus B (+2 V, then −2 V) |
+| `rs485_echo.py` | Listens and echoes every received line, which tests the DSM-to-sensor direction |
+
 ## Installation
 
 1. Flash MicroPython for the **Pico 2** from [micropython.org](https://micropython.org/download/RPI_PICO2/) (hold BOOTSEL, plug in USB, drag the UF2 onto the drive).
