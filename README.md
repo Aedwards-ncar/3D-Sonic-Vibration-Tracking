@@ -25,16 +25,15 @@ MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **Bosch BNO055**
 
 CAD files for an enclosure that mounts this sensor to the sonic anemometer are shared in this repository.
 
-- **Location:** `[path to CAD folder, e.g. /cad]`
-- **Formats:** `Step files and 3mf for polymaker ASA on the Core one + gen2 (prusa slicer 3.0)`
-- **Fits:** `Sonic anemometer CAST 3A, `
-- **Printing notes:** `[material, orientation, infill, anything that matters outdoors]`
+- **Location:** `[Place Holder]`
+- **Formats:** `Step files and 3mf for Core one + gen2 (prusa slicer 3.0)`
+- **Fits:** `Sonic anemometer CAST 3A, ISFS tower mounting bracket. [will need adaptation for Camble mount]`
+- **Printing notes:** `PolyMaker-Polylite ASA (white) 0.25mm Nozzle, could be done with 0.4mm Nozzle but may have more water intrusion around screw holes`
 
 Mounting notes:
 
 - Mount the enclosure **rigidly**. A loose sensor adds its own motion to the data.
 - Record how the sensor's X, Y, and Z axes line up with the sonic's axes: `[axis mapping]`.
-- **Recalibrate after mounting.** Once the enclosure is on the sonic and the mast is calm, send `CAL NOW` (see [Calibration](#calibration)) so the stored zero matches the final orientation.
 - Seal the enclosure and use cable glands for the RS-485 and power wiring.
 
 ## Hardware
@@ -45,8 +44,7 @@ Mounting notes:
 | Adafruit BNO055 breakout | Used in AMG (raw) mode, see below |
 | SparkFun SP3485 RS-485 breakout | 3.3 V transceiver |
 | MPM3610 5 V buck breakout | 12 V in, 5 V out to Pico VSYS |
-| 10 kΩ resistor | Pull-down on GP2 so the RS-485 driver stays off during boot/reset |
-| 120 Ω resistor | Bus termination at the far end of the cable |
+| Assorted m2.5 countersunk screws | Stainless steel Preferred |
 
 ### Pin map
 
