@@ -26,8 +26,8 @@ MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **Bosch BNO055**
 CAD files for an enclosure that mounts this sensor to the sonic anemometer are shared in this repository.
 
 - **Location:** `[path to CAD folder, e.g. /cad]`
-- **Formats:** `[e.g. STEP and STL]`
-- **Fits:** `[sonic anemometer model / mounting interface]`
+- **Formats:** `Step files and 3mf for polymaker ASA on the Core one + gen2 (prusa slicer 3.0)`
+- **Fits:** `Sonic anemometer CAST 3A, `
 - **Printing notes:** `[material, orientation, infill, anything that matters outdoors]`
 
 Mounting notes:
