@@ -2,8 +2,7 @@
 
 MicroPython firmware for a **Raspberry Pi Pico 2** that reads a **Bosch BNO055** and streams ASCII data over **RS-485**. It has two switchable output profiles, changed with a command: a **60 Hz chip profile** (the default, straight from the BNO055 with no Pico calibration) and a **120 Hz raw profile** (raw sensor data with Pico calibration). Built for unattended mounting on a tower: it has hardware and software watchdogs, I2C fault recovery, automatic calibration, and a remote command interface so it can be reset, recalibrated, or paused from the far end of the cable.
 
-<!-- Add wiring diagram here -->
-<!-- ![Wiring diagram](docs/wiring.png) -->
+**[Wiring diagram (PDF)](Wiring_Diagram.pdf)**
 
 ## Features
 
